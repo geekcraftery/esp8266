@@ -1,0 +1,61 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <Servo.h>
+
+#define ESC_PIN D1
+#define AP_SSID "Eclipse IoT"
+#define AP_PASSWORD "password123"
+
+Servo esc;
+ESP8266WebServer server(80);
+
+void handleRoot() {
+  String message = "<html><head><title>Welcome to BLDC Motor Control</title></head><body>";
+  message += "<h1>Welcome to Eclipse IoT</h1>";
+  message += "<p>This is the control interface for the BLDC motor.</p>";
+  message += "<p>Please use 'Eclipse Iot System' app from Google Play store to control the motor speed over wifi.</p>";
+  message += "</body></html>";
+  server.send(200, "text/html", message);
+}
+
+void handleSpeed() {
+  int speed = server.arg("speed").toInt();
+  speed = constrain(speed, 0, 180); // Limit speed value between 0 and 180
+  int throttle = map(speed, 0, 180, 1000, 2000); // Map speed to ESC throttle range
+  esc.write(throttle); // Set motor speed
+  String successMessage = "Speed set to " + String(speed);
+  successMessage += "<br><a href='/'>Go back</a>";
+  server.send(200, "text/html", successMessage);
+}
+
+void handleStop() {
+  esc.write(1000); // Set motor speed to 0
+  String successMessage = "Motor stopped";
+  successMessage += "<br><a href='/'>Go back</a>";
+  server.send(200, "text/html", successMessage);
+}
+
+void setup() {
+  esc.attach(ESC_PIN,  1000, 2000);
+  esc.write(0);
+  delay(2000);
+  
+  // Start Access Point
+  WiFi.softAP(AP_SSID, AP_PASSWORD);
+  IPAddress apIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(apIP);
+  
+  // Setup web server routes
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/speed", HTTP_GET, handleSpeed);
+  server.on("/stop", HTTP_GET, handleStop);
+  
+  // Start the server
+  server.begin();
+  Serial.println("Server started");
+}
+
+void loop() {
+  server.handleClient();
+}
